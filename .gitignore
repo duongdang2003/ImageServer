@@ -1,5 +1,7 @@
 /.vs/
-/Fotos/Web.config/
+/Fotos/bin/
+/Fotos/obj/
+/Fotos/Web.config
 # DNX
 project.lock.json
 artifacts/
