@@ -45,6 +45,7 @@ namespace ImageServer.Controllers
                 Response.AppendHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
                 Response.AppendHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Authorization");
 
+                System.Diagnostics.Debug.WriteLine(files.Count<HttpPostedFileBase>());
                 AlbumInfo albumInfo = JsonConvert.DeserializeObject<AlbumInfo>(jsonData);
                 if (files != null && files.Any())
                 {
@@ -111,8 +112,9 @@ namespace ImageServer.Controllers
             string[] validImageTypes = { "image/jpeg", "image/png", "image/gif", "image/bmp" };
             return validImageTypes.Contains(contentType.ToLower());
         }
-        [HttpGet]
-        public JsonResult GetImagePaths()
+
+        [HttpPost]
+        public JsonResult GetImageWithAlbumName(FormCollection form)
         {
             try
             {
@@ -120,15 +122,91 @@ namespace ImageServer.Controllers
                 Response.AppendHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
                 Response.AppendHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Authorization");
 
-                var imageDirectory = Server.MapPath("~/Content/Uploads");
+                var imageDirectory = Server.MapPath("~/Content/Uploads/" + form["userName"] + "/" + form["albumName"]);
                 var imagePaths = Directory.GetFiles(imageDirectory)
-                                          .Select(filePath => Url.Content("~/Content/Uploads/" + Path.GetFileName(filePath)))
+                                          .Select(filePath => Url.Content("https://localhost:44363/" + "Content/Uploads/" + form["userName"] + "/" + form["albumName"] + "/" + Path.GetFileName(filePath)))
                                           .ToList();
                 return Json(imagePaths, JsonRequestBehavior.AllowGet);
             } catch (Exception ex)
             {
                 return Json("Error: " + ex.Message);
 
+            }
+        }
+        [HttpPost]
+        public JsonResult GetAlbumWithUserName(string username)
+        {
+            try
+            {
+                Response.AppendHeader("Access-Control-Allow-Origin", "*");
+                Response.AppendHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+                Response.AppendHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Authorization");
+                System.Diagnostics.Debug.WriteLine(username);
+                var userDirectory = Server.MapPath("~/Content/Uploads/" + username);
+                if (!Directory.Exists(userDirectory))
+                {
+                    return Json(new { success = false, message = "User directory not found" }, JsonRequestBehavior.AllowGet);
+                }
+
+                var albums = new List<object>();
+
+                foreach (var albumDirectory in Directory.GetDirectories(userDirectory))
+                {
+                    var albumName = Path.GetFileName(albumDirectory);
+                    var imagePaths = Directory.GetFiles(albumDirectory)
+                                              .Select(filePath => Url.Content("https://localhost:44363/" + "/Content/Uploads/" + username + "/" + albumName + "/" + Path.GetFileName(filePath)))
+                                              .ToList();
+
+                    albums.Add(new { AlbumName = albumName, Images = imagePaths });
+                }
+
+                return Json(new { success = true, albums = albums }, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "Error: " + ex.Message }, JsonRequestBehavior.AllowGet);
+            }
+        }
+        [HttpGet]
+        public JsonResult GetAllImages()
+        {
+            try
+            {
+                Response.AppendHeader("Access-Control-Allow-Origin", "*");
+                Response.AppendHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+                Response.AppendHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Authorization");
+
+                var uploadsDirectory = Server.MapPath("~/Content/Uploads");
+                if (!Directory.Exists(uploadsDirectory))
+                {
+                    return Json(new { success = false, message = "Uploads directory not found" }, JsonRequestBehavior.AllowGet);
+                }
+
+                var users = new List<object>();
+
+                foreach (var userDirectory in Directory.GetDirectories(uploadsDirectory))
+                {
+                    var username = Path.GetFileName(userDirectory);
+                    var albums = new List<object>();
+
+                    foreach (var albumDirectory in Directory.GetDirectories(userDirectory))
+                    {
+                        var albumName = Path.GetFileName(albumDirectory);
+                        var imagePaths = Directory.GetFiles(albumDirectory)
+                                                  .Select(filePath => Url.Content("https://localhost:44363/" + "/Content/Uploads/" + username + "/" + albumName + "/" + Path.GetFileName(filePath)))
+                                                  .ToList();
+
+                        albums.Add(new { AlbumName = albumName, Images = imagePaths });
+                    }
+
+                    users.Add(new { Username = username, Albums = albums });
+                }
+
+                return Json(new { success = true, users = users }, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "Error: " + ex.Message }, JsonRequestBehavior.AllowGet);
             }
         }
     }
