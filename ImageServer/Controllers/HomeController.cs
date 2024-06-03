@@ -38,6 +38,8 @@ namespace ImageServer.Controllers
         [HttpPost]
         public ActionResult Upload(IEnumerable<HttpPostedFileBase> files, string jsonData)
         {
+            System.Diagnostics.Debug.WriteLine("Called");
+
             try
             {
                 // Add CORS headers before any other action
@@ -45,7 +47,7 @@ namespace ImageServer.Controllers
                 Response.AppendHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
                 Response.AppendHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Authorization");
 
-                System.Diagnostics.Debug.WriteLine(files.Count<HttpPostedFileBase>());
+                System.Diagnostics.Debug.WriteLine("Number of files: " + (files != null ? files.Count() : 0));
                 AlbumInfo albumInfo = JsonConvert.DeserializeObject<AlbumInfo>(jsonData);
                 if (files != null && files.Any())
                 {
@@ -57,36 +59,48 @@ namespace ImageServer.Controllers
                     // Ensure that the directory exists; if not, create it
                     if (!Directory.Exists(uploadDirectory))
                     {
+                        System.Diagnostics.Debug.WriteLine("Creating directory: " + uploadDirectory);
                         Directory.CreateDirectory(uploadDirectory);
                     }
 
                     foreach (var file in files)
                     {
-                        if (file != null && file.ContentLength > 0)
+                        try
                         {
-                            // Check if the uploaded file is an image
-                            if (IsImage(file.ContentType))
+                            if (file != null && file.ContentLength > 0)
                             {
-                                // Generate a unique filename
-                                string fileName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
+                                // Check if the uploaded file is an image
+                                if (IsImage(file.ContentType))
+                                {
+                                    // Generate a unique filename
+                                    string fileName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
 
-                                // Combine the directory and filename to get the full path
-                                string path = Path.Combine(uploadDirectory, fileName);
+                                    // Combine the directory and filename to get the full path
+                                    string path = Path.Combine(uploadDirectory, fileName);
 
-                                // Save the file to the specified path
-                                file.SaveAs(path);
+                                    // Save the file to the specified path
+                                    file.SaveAs(path);
 
-                                // Add the saved file path to the list
-                                savedFilePaths.Add(path);
+                                    // Add the saved file path to the list
+                                    savedFilePaths.Add(path);
+
+                                    System.Diagnostics.Debug.WriteLine("Saved file: " + path);
+                                }
+                                else
+                                {
+                                    return Content("Please upload valid image files only.");
+                                }
                             }
                             else
                             {
-                                return Content("Please upload valid image files only.");
+                                return Content("One or more files are empty.");
                             }
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            return Content("One or more files are empty.");
+                            System.Diagnostics.Debug.WriteLine("Error saving file: " + ex.Message);
+                            System.Diagnostics.Debug.WriteLine("Stack Trace: " + ex.StackTrace);
+                            return Content("Error saving file: " + ex.Message);
                         }
                     }
 
@@ -102,10 +116,11 @@ namespace ImageServer.Controllers
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine("Error: " + ex.Message);
+                System.Diagnostics.Debug.WriteLine("Stack Trace: " + ex.StackTrace);
                 return Content("Error: " + ex.Message);
             }
         }
-
         private bool IsImage(string contentType)
         {
             // Add logic to determine if the content type is an image
@@ -156,7 +171,7 @@ namespace ImageServer.Controllers
                     var imagePaths = Directory.GetFiles(albumDirectory)
                                               .Select(filePath => Url.Content("https://localhost:44363/" + "/Content/Uploads/" + username + "/" + albumName + "/" + Path.GetFileName(filePath)))
                                               .ToList();
-
+                    
                     albums.Add(new { AlbumName = albumName, Images = imagePaths });
                 }
 
@@ -181,11 +196,12 @@ namespace ImageServer.Controllers
                 {
                     return Json(new { success = false, message = "Uploads directory not found" }, JsonRequestBehavior.AllowGet);
                 }
-
+                    
                 var users = new List<object>();
 
                 foreach (var userDirectory in Directory.GetDirectories(uploadsDirectory))
                 {
+                    System.Diagnostics.Debug.WriteLine(userDirectory);
                     var username = Path.GetFileName(userDirectory);
                     var albums = new List<object>();
 
